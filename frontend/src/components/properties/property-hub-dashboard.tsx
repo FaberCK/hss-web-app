@@ -2,6 +2,7 @@ import { useState } from "react"
 import { Card, CardHeader, CardBody, Divider, Button, Input, Select, SelectItem, Spinner, CheckboxGroup, Checkbox, Chip } from "@nextui-org/react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../lib/api"
+import { RequireRole } from "../auth/require-role"
 
 interface Property {
   id: string
@@ -102,6 +103,7 @@ export function PropertyHubDashboard() {
     <div className="max-w-6xl mx-auto space-y-8">
       
       {/* Create New Hub Section */}
+      <RequireRole allowedRoles={["ADMIN"]}>
       <Card className="shadow-sm border border-gray-200">
         <CardHeader className="px-6 pt-6 pb-4">
           <h3 className="text-xl font-semibold text-gray-800">Create Custom Hub</h3>
@@ -141,7 +143,7 @@ export function PropertyHubDashboard() {
           </div>
         </CardBody>
       </Card>
-
+      </RequireRole>
       {/* Hubs List & Management */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {hubs?.map((hub) => (

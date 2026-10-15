@@ -1,16 +1,21 @@
 import { Controller, Get, Post, Body, Param, HttpCode, HttpStatus } from '@nestjs/common';
 import { PropertiesService } from './properties.service';
 import { CreatePropertyDto } from './dto/create-property.dto';
-import { Property } from '@prisma/client';
+import { UseGuards } from '@nestjs/common';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Property, Role } from '@prisma/client';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 /**
  * Controller handling property routing and endpoints.
  */
 @Controller('properties')
+@UseGuards(RolesGuard) // Applies the guard to all routes in this controller
 export class PropertiesController {
   constructor(private readonly propertiesService: PropertiesService) {}
-
+  
   @Post()
+  @Roles(Role.ADMIN) // Strictly limits property creation to ADMINs
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() createPropertyDto: CreatePropertyDto): Promise<Property> {
     return this.propertiesService.createProperty(createPropertyDto);
