@@ -3,6 +3,7 @@ import { Card, CardHeader, CardBody, Divider, Button, Input, Select, SelectItem,
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../lib/api"
 import { RequireRole } from "../auth/require-role"
+import { AddPropertyModal } from "./add-property-modal"
 
 interface Property {
   id: string
@@ -25,6 +26,8 @@ const DIVISIONS = [
 
 export function PropertyHubDashboard() {
   const queryClient = useQueryClient()
+  const [isAddPropertyModalOpen, setIsAddPropertyModalOpen] = useState(false)
+  const [selectedHub, setSelectedHub] = useState<Hub | null>(null)
 
   // --- Queries ---
   const { data: hubs, isLoading: loadingHubs } = useQuery<Hub[]>({
@@ -102,11 +105,12 @@ export function PropertyHubDashboard() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       
-      {/* Create New Hub Section */}
+      {/* Create New Hub & Property Section */}
       <RequireRole allowedRoles={["ADMIN"]}>
       <Card className="shadow-sm border border-gray-200">
-        <CardHeader className="px-6 pt-6 pb-4">
-          <h3 className="text-xl font-semibold text-gray-800">Create Custom Hub</h3>
+        <CardHeader className="px-6 pt-6 pb-4 flex justify-between items-center">
+          <h3 className="text-xl font-semibold text-gray-800">Infrastructure Management</h3>
+
         </CardHeader>
         <Divider />
         <CardBody className="px-6 py-6">
@@ -153,6 +157,16 @@ export function PropertyHubDashboard() {
                 <h4 className="text-lg font-semibold text-gray-800">{hub.name}</h4>
                 <p className="text-xs text-gray-500 font-mono mt-1">ID: {hub.id}</p>
               </div>
+              <Button 
+                size="sm"
+                variant="flat"
+                onPress={() => {
+                  setSelectedHub(hub);
+                  setIsAddPropertyModalOpen(true);
+                }}
+              >
+                +
+              </Button>
               <Button size="sm" variant="flat" onPress={() => handleOpenEdit(hub)}>
                 Manage Properties
               </Button>
@@ -206,6 +220,13 @@ export function PropertyHubDashboard() {
           </Card>
         ))}
       </div>
+      
+      {/* Add Property Modal */}
+      <AddPropertyModal 
+        isOpen={isAddPropertyModalOpen}
+        onOpenChange={setIsAddPropertyModalOpen}
+        hub={selectedHub!}
+      />
     </div>
   )
 }

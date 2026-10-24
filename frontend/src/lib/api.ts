@@ -23,3 +23,21 @@ apiClient.interceptors.request.use((config) => {
   return config
 })
 
+// Log out when the server rejects an expired or invalid token
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const isLoginRequest = error.config?.url?.includes("/auth/login")
+
+    if (error.response?.status === 401 && !isLoginRequest) {
+      localStorage.removeItem("accessToken")
+      localStorage.removeItem("activeScopeId")
+
+      if (window.location.pathname !== "/login") {
+        window.location.assign("/login")
+      }
+    }
+
+    return Promise.reject(error)
+  },
+)

@@ -25,9 +25,7 @@ export class AuthContextMiddleware implements NestMiddleware {
     let payload: { sub: string; email: string; organizationId: string };
 
     try {
-      payload = this.jwtService.verify(token, {
-        secret: process.env.JWT_SECRET,
-      });
+      payload = this.jwtService.verify(token);
     } catch (err: unknown) {
       throw new UnauthorizedException('Invalid or expired authentication token');
     }

@@ -37,7 +37,7 @@ services:
         - backend_node_modules:/app/node_modules
       environment:
         - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres_secure_password}@postgres:5432/${POSTGRES_DB:-hss_db}?schema=public
-        - JWT_SECRET=${JWT_SECRET:-your_super_secret_jwt_key_here}
+        - JWT_SECRET=${JWT_SECRET}
         - CHOKIDAR_USEPOLLING=true
         - WATCHPACK_POLLING=true
       depends_on:
