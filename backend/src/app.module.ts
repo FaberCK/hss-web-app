@@ -24,6 +24,8 @@ import { UsersModule } from './users/users.module';
 import { HubsModule } from './hubs/hubs.module';
 import { DepartmentsModule } from './departments/departments.module';
 import { DashboardModule } from './dashboard/dashboard.module';
+import { DivisionsModule } from './divisions/divisions.module';
+import { OrganizationsModule } from './organizations/organizations.module';
 import { AuthContextMiddleware } from './auth/middlewares/auth-context.middleware';
 
 @Module({
@@ -34,7 +36,9 @@ import { AuthContextMiddleware } from './auth/middlewares/auth-context.middlewar
     UsersModule, 
     HubsModule, 
     DepartmentsModule, 
-    DashboardModule
+    DashboardModule,
+    DivisionsModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

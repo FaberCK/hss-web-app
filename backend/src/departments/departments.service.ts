@@ -1,7 +1,9 @@
 import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../shared/prisma/prisma.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
-import { Department } from '@prisma/client';
+import { Department, Role } from '@prisma/client';
+import { propertyWhereForScopes } from '../auth/scope-query';
+import type { UserScopeGrant } from '../auth/interfaces/user-context.interface';
 
 @Injectable()
 export class DepartmentsService {
@@ -21,13 +23,30 @@ export class DepartmentsService {
     });
   }
 
-  async findAllDepartments(): Promise<Department[]> {
-    return this.prisma.department.findMany();
+  async findAllDepartments(scopes: UserScopeGrant[]): Promise<Department[]> {
+    return this.prisma.department.findMany({
+      where: {
+        AND: [
+          { properties: { some: { property: propertyWhereForScopes(scopes) } } },
+          ...(scopes.some((scope) => scope.role === Role.ADMIN)
+            ? []
+            : [{ id: { in: [...new Set(scopes.flatMap((scope) => scope.departmentIds))] } }]),
+        ],
+      },
+    });
   }
 
-  async findDepartmentById(id: string): Promise<Department> {
-    const department = await this.prisma.department.findUnique({
-      where: { id },
+  async findDepartmentById(id: string, scopes: UserScopeGrant[]): Promise<Department> {
+    const department = await this.prisma.department.findFirst({
+      where: {
+        AND: [
+          { id },
+          { properties: { some: { property: propertyWhereForScopes(scopes) } } },
+          ...(scopes.some((scope) => scope.role === Role.ADMIN)
+            ? []
+            : [{ id: { in: [...new Set(scopes.flatMap((scope) => scope.departmentIds))] } }]),
+        ],
+      },
     });
 
     if (!department) {

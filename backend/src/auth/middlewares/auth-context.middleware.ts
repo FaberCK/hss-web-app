@@ -1,4 +1,5 @@
 import { Injectable, NestMiddleware, UnauthorizedException } from '@nestjs/common';
+import { ScopeLevel } from '@prisma/client';
 import { Request, Response, NextFunction } from 'express';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../../shared/prisma/prisma.service';
@@ -30,7 +31,8 @@ export class AuthContextMiddleware implements NestMiddleware {
       throw new UnauthorizedException('Invalid or expired authentication token');
     }
 
-    const activeScopeId = req.headers['x-hss-scope-id'] as string;
+    const requestedScopeId = req.headers['x-hss-scope-id'] as string | undefined;
+    const requestedScopeLevel = req.headers['x-hss-scope-level'] as ScopeLevel | undefined;
 
     const user = await this.prisma.user.findUnique({
       where: { id: payload.sub },
@@ -47,13 +49,50 @@ export class AuthContextMiddleware implements NestMiddleware {
       throw new UnauthorizedException('User account is inactive or not found');
     }
 
-    let relevantScopes = user.scopes;
-    if (activeScopeId) {
-      const scopedMatch = user.scopes.filter((scope) => scope.entityId === activeScopeId);
-      if (scopedMatch.length > 0) {
-        relevantScopes = scopedMatch;
-      }
-    }
+    const entityIds = (scopeLevel: ScopeLevel) => [
+      ...new Set(user.scopes.filter((scope) => scope.scopeLevel === scopeLevel).map((scope) => scope.entityId)),
+    ];
+    const [organizations, divisions, hubs, properties] = await Promise.all([
+      this.prisma.organization.findMany({
+        where: { id: { in: entityIds(ScopeLevel.ORGANIZATION) } },
+        select: { id: true, name: true },
+      }),
+      this.prisma.division.findMany({
+        where: { id: { in: entityIds(ScopeLevel.DIVISION) } },
+        select: { id: true, name: true },
+      }),
+      this.prisma.hub.findMany({
+        where: { id: { in: entityIds(ScopeLevel.HUB) } },
+        select: { id: true, name: true },
+      }),
+      this.prisma.property.findMany({
+        where: { id: { in: entityIds(ScopeLevel.PROPERTY) } },
+        select: { id: true, name: true, code: true },
+      }),
+    ]);
+    const scopeNames = new Map<string, string>();
+    organizations.forEach((entity) => scopeNames.set(`${ScopeLevel.ORGANIZATION}:${entity.id}`, entity.name));
+    divisions.forEach((entity) => scopeNames.set(`${ScopeLevel.DIVISION}:${entity.id}`, entity.name));
+    hubs.forEach((entity) => scopeNames.set(`${ScopeLevel.HUB}:${entity.id}`, entity.name));
+    properties.forEach((entity) => scopeNames.set(`${ScopeLevel.PROPERTY}:${entity.id}`, `${entity.name} (${entity.code})`));
+
+    const relevantScopes = requestedScopeId && requestedScopeLevel
+      ? user.scopes.filter((scope) => scope.entityId === requestedScopeId && scope.scopeLevel === requestedScopeLevel)
+      : [];
+    const assignedScopes = user.scopes.map((scope) => ({
+      entityId: scope.entityId,
+      scopeLevel: scope.scopeLevel,
+      name: scopeNames.get(`${scope.scopeLevel}:${scope.entityId}`)
+        ?? `${scope.scopeLevel} (${scope.entityId.slice(0, 8)})`,
+      role: scope.role,
+      departmentIds: scope.departments.map((department) => department.departmentId),
+    }));
+    const activeScopes = relevantScopes.map((scope) => ({
+      entityId: scope.entityId,
+      scopeLevel: scope.scopeLevel,
+      role: scope.role,
+      departmentIds: scope.departments.map((department) => department.departmentId),
+    }));
 
     const roles = relevantScopes.map((scope) => scope.role);
     const departmentIdSet = new Set<string>();
@@ -67,7 +106,9 @@ export class AuthContextMiddleware implements NestMiddleware {
       userId: user.id,
       email: user.email,
       organizationId: user.organizationId,
-      activeScopeId,
+      activeScopeId: relevantScopes[0]?.entityId,
+      assignedScopes,
+      activeScopes,
       roles,
       allowedDepartments: Array.from(departmentIdSet),
       scopeLevel: relevantScopes[0]?.scopeLevel,

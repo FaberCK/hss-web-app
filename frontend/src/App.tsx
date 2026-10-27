@@ -24,6 +24,7 @@ import { DashboardSummary } from "./components/dashboard/dashboard-summary"
 import { UserInviteMatrix } from "./components/users/user-invite-matrix"
 import { PropertyHubDashboard } from "./components/properties/property-hub-dashboard"
 import { Login } from "./components/auth/login"
+import { RequireRole } from "./components/auth/require-role"
 
 function App() {
   const isAuthenticated = !!localStorage.getItem("accessToken")
@@ -31,7 +32,7 @@ function App() {
   return (
     <div className="w-full h-full">
       <Routes>
-        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/users" replace />} />
+        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/dashboard" replace />} />
         
         {/* Authenticated Routes wrapped in AppLayout */}
         <Route 
@@ -41,7 +42,7 @@ function App() {
 
         <Route 
           path="/users" 
-          element={isAuthenticated ? <AppLayout><UserInviteMatrix /></AppLayout> : <Navigate to="/login" replace />} 
+          element={isAuthenticated ? <AppLayout><RequireRole allowedRoles={["ADMIN"]} redirectTo="/dashboard"><UserInviteMatrix /></RequireRole></AppLayout> : <Navigate to="/login" replace />} 
         />
         <Route 
           path="/hubs" 
@@ -49,7 +50,7 @@ function App() {
         />
         
         {/* Catch-all redirect */}
-        <Route path="*" element={<Navigate to={isAuthenticated ? "/users" : "/login"} replace />} />
+        <Route path="*" element={<Navigate to={isAuthenticated ? "/dashboard" : "/login"} replace />} />
       </Routes>
     </div>
   )

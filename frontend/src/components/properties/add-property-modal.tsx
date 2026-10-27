@@ -1,5 +1,5 @@
-import { useState } from "react"
-import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input } from "@nextui-org/react"
+import { useEffect, useState } from "react"
+import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem } from "@nextui-org/react"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../lib/api"
 import { useAuth } from "../../hooks/use-auth"
@@ -7,14 +7,15 @@ import { useAuth } from "../../hooks/use-auth"
 interface AddPropertyModalProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  hub: {
+  hub?: {
     id: string;
     divisionId: string;
     name: string;
   };
+  divisions: { id: string; name: string }[];
 }
 
-export function AddPropertyModal({ isOpen, onOpenChange, hub }: AddPropertyModalProps) {
+export function AddPropertyModal({ isOpen, onOpenChange, hub, divisions }: AddPropertyModalProps) {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [formData, setFormData] = useState({
@@ -23,7 +24,12 @@ export function AddPropertyModal({ isOpen, onOpenChange, hub }: AddPropertyModal
   })
   const [errors, setErrors] = useState<{ name?: string; code?: string }>({})
   const [isLoading, setIsLoading] = useState(false)
+  const [divisionId, setDivisionId] = useState("")
 
+  useEffect(() => {
+    if (!isOpen) return
+    setDivisionId(hub?.divisionId ?? divisions[0]?.id ?? "")
+  }, [divisions, hub?.divisionId, isOpen])
 
 
   const handleInputChange = (field: 'name' | 'code', value: string) => {
@@ -55,17 +61,12 @@ export function AddPropertyModal({ isOpen, onOpenChange, hub }: AddPropertyModal
     
     setIsLoading(true);
     try {
-      // 1. Create the property with the hub's divisionId
-      const newProperty = await apiClient.post("/properties", {
+      await apiClient.post("/properties", {
         name: formData.name,
         code: formData.code,
-        divisionId: hub.divisionId,
-        organizationId: user?.organizationId || ""
-      });
-      
-      // 2. Add the new property to the hub
-      await apiClient.patch(`/hubs/${hub.id}/properties`, {
-        propertyIds: [newProperty.data.id] // Just add the new property
+        divisionId: hub?.divisionId ?? divisionId,
+        organizationId: user?.organizationId || "",
+        ...(hub ? { hubId: hub.id } : {}),
       });
       
       // Refresh data
@@ -96,8 +97,23 @@ export function AddPropertyModal({ isOpen, onOpenChange, hub }: AddPropertyModal
       <ModalContent>
         {(onClose) => (
           <>
-            <ModalHeader className="flex flex-col gap-1">Add New Property</ModalHeader>
+            <ModalHeader className="flex flex-col gap-1">
+              {hub ? `Add Property to ${hub.name}` : "Create Unassigned Property"}
+            </ModalHeader>
             <ModalBody>
+              {!hub && (
+                <Select
+                  label="Division"
+                  placeholder="Select division"
+                  variant="bordered"
+                  selectedKeys={divisionId ? [divisionId] : []}
+                  onChange={(event) => setDivisionId(event.target.value)}
+                >
+                  {divisions.map((division) => (
+                    <SelectItem key={division.id}>{division.name}</SelectItem>
+                  ))}
+                </Select>
+              )}
               <Input
                 label="Property Name"
                 placeholder="Enter property name"
@@ -130,7 +146,7 @@ export function AddPropertyModal({ isOpen, onOpenChange, hub }: AddPropertyModal
                 color="primary" 
                 onPress={handleSubmit}
                 isLoading={isLoading}
-                isDisabled={!formData.name || !formData.code || !user?.organizationId}
+                isDisabled={!formData.name || !formData.code || !user?.organizationId || !(hub?.divisionId ?? divisionId)}
               >
                 Create Property
               </Button>

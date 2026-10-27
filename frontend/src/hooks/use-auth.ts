@@ -6,6 +6,13 @@ export interface UserProfile {
   email: string
   organizationId: string
   activeScopeId?: string
+  assignedScopes: {
+    entityId: string
+    scopeLevel: string
+    name: string
+    role: string
+    departmentIds: string[]
+  }[]
   roles: string[]
   allowedDepartments: string[]
   scopeLevel?: string

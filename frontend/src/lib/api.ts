@@ -12,12 +12,14 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config) => {
   const token = localStorage.getItem("accessToken") // We will store this upon login
   const activeScopeId = localStorage.getItem("activeScopeId")
+  const activeScopeLevel = localStorage.getItem("activeScopeLevel")
 
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
-  if (activeScopeId) {
+  if (activeScopeId && activeScopeLevel) {
     config.headers["x-hss-scope-id"] = activeScopeId
+    config.headers["x-hss-scope-level"] = activeScopeLevel
   }
 
   return config
@@ -32,6 +34,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && !isLoginRequest) {
       localStorage.removeItem("accessToken")
       localStorage.removeItem("activeScopeId")
+      localStorage.removeItem("activeScopeLevel")
 
       if (window.location.pathname !== "/login") {
         window.location.assign("/login")

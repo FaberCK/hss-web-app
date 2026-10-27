@@ -16,8 +16,8 @@ export function Login() {
     },
     onSuccess: (data) => {
       localStorage.setItem("accessToken", data.accessToken)
-      // Navigate to the main dashboard and refresh to initialize API interceptors
-      navigate("/users")
+      // Reload after login so the authenticated API context is initialized.
+      navigate("/dashboard")
       window.location.reload()
     },
     onError: (error: any) => {

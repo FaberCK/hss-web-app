@@ -15,6 +15,7 @@ export function AppLayout({ children }: AppLayoutProps) {
   function handleLogout() {
     localStorage.removeItem("accessToken")
     localStorage.removeItem("activeScopeId")
+    localStorage.removeItem("activeScopeLevel")
     window.location.href = "/login"
   }
 

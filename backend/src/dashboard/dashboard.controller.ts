@@ -9,7 +9,6 @@ export class DashboardController {
   @Get('summary')
   @HttpCode(HttpStatus.OK)
   async getSummary(@Req() req: express.Request): Promise<ScopeSummary> {
-    const activeScopeId = req.headers['x-hss-scope-id'] as string;
-    return this.dashboardService.getScopeSummary(activeScopeId);
+    return this.dashboardService.getScopeSummary(req.user!.activeScopes);
   }
 }

@@ -8,9 +8,18 @@ export interface UserContext {
   email: string;
   organizationId: string;
   activeScopeId?: string;
+  assignedScopes: UserAssignedScope[];
+  activeScopes: UserScopeGrant[];
   roles: Role[];
   allowedDepartments: string[];
   scopeLevel?: ScopeLevel;
+}
+
+export interface UserScopeGrant {
+  entityId: string;
+  scopeLevel: ScopeLevel;
+  role: Role;
+  departmentIds: string[];
 }
 
 // Extend Express Request object globally so req.user is fully typed
@@ -20,4 +29,8 @@ declare global {
       user?: UserContext;
     }
   }
+}
+
+export interface UserAssignedScope extends UserScopeGrant {
+  name: string;
 }

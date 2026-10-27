@@ -4,12 +4,26 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../lib/api"
 import { RequireRole } from "../auth/require-role"
 import { AddPropertyModal } from "./add-property-modal"
+import { EditPropertyModal } from "./edit-property-modal"
+import { useAuth } from "../../hooks/use-auth"
+import { DivisionManagement } from "./division-management"
 
 interface Property {
   id: string
   name: string
   code: string
   divisionId: string
+}
+
+interface PropertyListItem extends Property {
+  division: { id: string; name: string }
+  _count: { hubs: number }
+}
+
+interface Division {
+  id: string
+  name: string
+  organizationId: string
 }
 
 interface Hub {
@@ -19,15 +33,12 @@ interface Hub {
   properties: Property[]
 }
 
-const DIVISIONS = [
-  { id: "d2276a9c-a460-4cb8-b3f7-cbac65bb3194", name: "North America Region" },
-  { id: "f99b7d7d-77f1-4d77-b5f8-aca3b8e27e11", name: "Europe Region" }
-]
-
 export function PropertyHubDashboard() {
   const queryClient = useQueryClient()
+  const { user } = useAuth()
   const [isAddPropertyModalOpen, setIsAddPropertyModalOpen] = useState(false)
   const [selectedHub, setSelectedHub] = useState<Hub | null>(null)
+  const [editingPropertyId, setEditingPropertyId] = useState<string | null>(null)
 
   // --- Queries ---
   const { data: hubs, isLoading: loadingHubs } = useQuery<Hub[]>({
@@ -38,12 +49,17 @@ export function PropertyHubDashboard() {
     },
   })
 
-  const { data: properties, isLoading: loadingProps } = useQuery<Property[]>({
+  const { data: properties, isLoading: loadingProps } = useQuery<PropertyListItem[]>({
     queryKey: ["properties"],
     queryFn: async () => {
       const res = await apiClient.get("/properties")
       return res.data
     },
+  })
+
+  const { data: divisions, isLoading: loadingDivisions } = useQuery<Division[]>({
+    queryKey: ["divisions"],
+    queryFn: async () => (await apiClient.get("/divisions")).data,
   })
 
   // --- Form State ---
@@ -52,6 +68,12 @@ export function PropertyHubDashboard() {
   
   const [editingHubId, setEditingHubId] = useState<string | null>(null)
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([])
+  const availableDivisions = divisions ?? []
+  const standaloneDivisions = user?.scopeLevel === "ORGANIZATION"
+    ? availableDivisions.filter((division) => division.organizationId === user.organizationId)
+    : user?.scopeLevel === "DIVISION"
+      ? availableDivisions.filter((division) => division.id === user.activeScopeId)
+      : []
 
   // --- Mutations ---
   const createHubMutation = useMutation({
@@ -69,8 +91,11 @@ export function PropertyHubDashboard() {
     mutationFn: async ({ hubId, propertyIds }: { hubId: string, propertyIds: string[] }) => {
       return await apiClient.patch(`/hubs/${hubId}/properties`, { propertyIds })
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["hubs"] })
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["hubs"] }),
+        queryClient.invalidateQueries({ queryKey: ["properties"] }),
+      ])
       setEditingHubId(null)
     }
   })
@@ -94,7 +119,7 @@ export function PropertyHubDashboard() {
     })
   }
 
-  if (loadingHubs || loadingProps) {
+  if (loadingHubs || loadingProps || loadingDivisions) {
     return (
       <div className="flex justify-center items-center h-64">
         <Spinner size="lg" color="primary" label="Loading infrastructure..." />
@@ -105,6 +130,12 @@ export function PropertyHubDashboard() {
   return (
     <div className="max-w-6xl mx-auto space-y-8">
       
+      {(user?.scopeLevel === "ORGANIZATION" || user?.scopeLevel === "DIVISION") && (
+        <RequireRole allowedRoles={["ADMIN"]}>
+          <DivisionManagement />
+        </RequireRole>
+      )}
+
       {/* Create New Hub & Property Section */}
       <RequireRole allowedRoles={["ADMIN"]}>
       <Card className="shadow-sm border border-gray-200">
@@ -131,7 +162,7 @@ export function PropertyHubDashboard() {
               onChange={(e) => setNewHubDivision(e.target.value)}
               className="flex-1"
             >
-              {DIVISIONS.map((div) => (
+              {availableDivisions.map((div) => (
                 <SelectItem key={div.id} value={div.id}>{div.name}</SelectItem>
               ))}
             </Select>
@@ -148,6 +179,54 @@ export function PropertyHubDashboard() {
         </CardBody>
       </Card>
       </RequireRole>
+
+      <Card className="shadow-sm border border-gray-200">
+        <CardHeader className="flex justify-between items-center px-6 py-4">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-800">Unassigned Properties</h3>
+            <p className="text-sm text-gray-500">Properties not assigned to a Hub</p>
+          </div>
+          {standaloneDivisions.length > 0 && (
+            <RequireRole allowedRoles={["ADMIN"]}>
+              <Button
+                color="primary"
+                size="sm"
+                onPress={() => {
+                  setSelectedHub(null)
+                  setIsAddPropertyModalOpen(true)
+                }}
+              >
+                Create Property
+              </Button>
+            </RequireRole>
+          )}
+        </CardHeader>
+        <Divider />
+        <CardBody className="px-6 py-4">
+          {properties?.filter((property) => property._count.hubs === 0).length ? (
+            <div className="flex flex-wrap gap-2">
+              {properties.filter((property) => property._count.hubs === 0).map((property) => (
+                <Chip key={property.id} variant="flat" color="primary" size="sm">
+                  <RequireRole allowedRoles={["ADMIN"]}>
+                    <button
+                      type="button"
+                      className="underline underline-offset-2"
+                      aria-label={`Edit ${property.name}`}
+                      onClick={() => setEditingPropertyId(property.id)}
+                    >
+                      {property.name}
+                    </button>
+                  </RequireRole>
+                  <span> ({property.code})</span>
+                </Chip>
+              ))}
+            </div>
+          ) : (
+            <span className="text-sm text-gray-500">No unassigned properties.</span>
+          )}
+        </CardBody>
+      </Card>
+
       {/* Hubs List & Management */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {hubs?.map((hub) => (
@@ -157,19 +236,23 @@ export function PropertyHubDashboard() {
                 <h4 className="text-lg font-semibold text-gray-800">{hub.name}</h4>
                 <p className="text-xs text-gray-500 font-mono mt-1">ID: {hub.id}</p>
               </div>
-              <Button 
-                size="sm"
-                variant="flat"
-                onPress={() => {
-                  setSelectedHub(hub);
-                  setIsAddPropertyModalOpen(true);
-                }}
-              >
-                +
-              </Button>
-              <Button size="sm" variant="flat" onPress={() => handleOpenEdit(hub)}>
-                Manage Properties
-              </Button>
+              <RequireRole allowedRoles={["ADMIN"]}>
+                <div className="flex gap-2">
+                  <Button 
+                    size="sm"
+                    variant="flat"
+                    onPress={() => {
+                      setSelectedHub(hub);
+                      setIsAddPropertyModalOpen(true);
+                    }}
+                  >
+                    +
+                  </Button>
+                  <Button size="sm" variant="flat" onPress={() => handleOpenEdit(hub)}>
+                    Manage Properties
+                  </Button>
+                </div>
+              </RequireRole>
             </CardHeader>
             <Divider />
             <CardBody className="px-6 py-4">
@@ -180,7 +263,17 @@ export function PropertyHubDashboard() {
                   {hub.properties.length > 0 ? (
                     hub.properties.map(p => (
                       <Chip key={p.id} variant="flat" color="primary" size="sm">
-                        {p.name} ({p.code})
+                        <RequireRole allowedRoles={["ADMIN"]}>
+                          <button
+                            type="button"
+                            className="underline underline-offset-2"
+                            aria-label={`Edit ${p.name}`}
+                            onClick={() => setEditingPropertyId(p.id)}
+                          >
+                            {p.name}
+                          </button>
+                        </RequireRole>
+                        <span> ({p.code})</span>
                       </Chip>
                     ))
                   ) : (
@@ -202,6 +295,11 @@ export function PropertyHubDashboard() {
                     ))}
                   </CheckboxGroup>
                   <div className="flex gap-2 justify-end">
+                    {updateHubPropertiesMutation.isError && (
+                      <p className="self-center text-sm text-danger">
+                        {updateHubPropertiesMutation.error.message || "Could not update Hub properties."}
+                      </p>
+                    )}
                     <Button size="sm" variant="light" onPress={() => setEditingHubId(null)}>
                       Cancel
                     </Button>
@@ -224,8 +322,16 @@ export function PropertyHubDashboard() {
       {/* Add Property Modal */}
       <AddPropertyModal 
         isOpen={isAddPropertyModalOpen}
-        onOpenChange={setIsAddPropertyModalOpen}
-        hub={selectedHub!}
+        onOpenChange={(isOpen) => {
+          setIsAddPropertyModalOpen(isOpen)
+          if (!isOpen) setSelectedHub(null)
+        }}
+        hub={selectedHub ?? undefined}
+        divisions={standaloneDivisions}
+      />
+      <EditPropertyModal
+        propertyId={editingPropertyId}
+        onClose={() => setEditingPropertyId(null)}
       />
     </div>
   )

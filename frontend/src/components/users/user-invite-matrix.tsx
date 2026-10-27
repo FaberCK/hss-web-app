@@ -12,18 +12,40 @@ interface Property {
   id: string
   name: string
   code: string
+  divisionId: string
+  division: { id: string; name: string }
   departments: { department: Department }[]
 }
 
+interface Hub {
+  id: string
+  name: string
+  properties: { id: string }[]
+}
+
+type ScopeLevel = "ORGANIZATION" | "DIVISION" | "HUB" | "PROPERTY"
+
+const ORGANIZATION_ID = "78f74918-f5e1-4c97-9d26-1b6c37f4a052"
+
 export function UserInviteMatrix() {
   // Fetch real properties and their associated departments from the backend
-  const { data: properties, isLoading } = useQuery<Property[]>({
+  const { data: properties, isLoading: isLoadingProperties } = useQuery<Property[]>({
     queryKey: ["properties"],
     queryFn: async () => {
       const response = await apiClient.get("/properties")
       return response.data
     },
   })
+
+  const { data: hubs, isLoading: isLoadingHubs } = useQuery<Hub[]>({
+    queryKey: ["hubs"],
+    queryFn: async () => {
+      const response = await apiClient.get("/hubs")
+      return response.data
+    },
+  })
+
+  const isLoading = isLoadingProperties || isLoadingHubs
 
   const roles = [
     { key: "ADMIN", label: "Admin" },
@@ -38,6 +60,28 @@ export function UserInviteMatrix() {
     firstName: "",
     lastName: "",
     role: "",
+  })
+  const [scopeLevel, setScopeLevel] = useState<ScopeLevel>("ORGANIZATION")
+  const [entityId, setEntityId] = useState(ORGANIZATION_ID)
+
+  const divisions = Array.from(
+    new Map((properties ?? []).map(({ division }) => [division.id, division])).values(),
+  )
+  const scopeEntities = scopeLevel === "ORGANIZATION"
+    ? [{ id: ORGANIZATION_ID, name: "Global Hotel Group" }]
+    : scopeLevel === "DIVISION"
+      ? divisions
+      : scopeLevel === "HUB"
+        ? (hubs ?? [])
+        : (properties ?? [])
+
+  const scopedProperties = (properties ?? []).filter((property) => {
+    if (scopeLevel === "ORGANIZATION") return true
+    if (scopeLevel === "DIVISION") return property.divisionId === entityId
+    if (scopeLevel === "HUB") {
+      return hubs?.find((hub) => hub.id === entityId)?.properties.some(({ id }) => id === property.id) ?? false
+    }
+    return property.id === entityId
   })
 
   // State maps a property ID to an array of selected department IDs
@@ -60,6 +104,26 @@ export function UserInviteMatrix() {
 
   function handleInputChange(field: string, value: string) {
     setFormData((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function handleScopeLevelChange(value: string) {
+    const nextScopeLevel = value as ScopeLevel
+    const nextEntities = nextScopeLevel === "ORGANIZATION"
+      ? [{ id: ORGANIZATION_ID, name: "Global Hotel Group" }]
+      : nextScopeLevel === "DIVISION"
+        ? divisions
+        : nextScopeLevel === "HUB"
+          ? (hubs ?? [])
+          : (properties ?? [])
+
+    setScopeLevel(nextScopeLevel)
+    setEntityId(nextEntities[0]?.id ?? "")
+    setSelectedPermissions({})
+  }
+
+  function handleEntityChange(value: string) {
+    setEntityId(value)
+    setSelectedPermissions({})
   }
 
   function handleDepartmentToggle(propertyId: string, departmentId: string, isSelected: boolean) {
@@ -88,9 +152,9 @@ export function UserInviteMatrix() {
 
     const payload = {
       ...formData,
-      organizationId: "78f74918-f5e1-4c97-9d26-1b6c37f4a052", // Global Hotel Group ID
-      scopeLevel: "ORGANIZATION",
-      entityId: "78f74918-f5e1-4c97-9d26-1b6c37f4a052",
+      organizationId: ORGANIZATION_ID,
+      scopeLevel,
+      entityId,
       departmentIds: allSelectedDepartments,
     }
     
@@ -157,12 +221,35 @@ export function UserInviteMatrix() {
                 </SelectItem>
               ))}
             </Select>
+            <Select
+              label="Scope level"
+              placeholder="Select scope level"
+              variant="bordered"
+              selectedKeys={[scopeLevel]}
+              onChange={(e) => handleScopeLevelChange(e.target.value)}
+            >
+              <SelectItem key="ORGANIZATION">Organization</SelectItem>
+              <SelectItem key="DIVISION">Division</SelectItem>
+              <SelectItem key="HUB">Hub</SelectItem>
+              <SelectItem key="PROPERTY">Property</SelectItem>
+            </Select>
+            <Select
+              label={`${scopeLevel.charAt(0)}${scopeLevel.slice(1).toLowerCase()} scope`}
+              placeholder="Select scope"
+              variant="bordered"
+              selectedKeys={entityId ? [entityId] : []}
+              onChange={(e) => handleEntityChange(e.target.value)}
+            >
+              {scopeEntities.map((entity) => (
+                <SelectItem key={entity.id}>{entity.name}</SelectItem>
+              ))}
+            </Select>
           </div>
 
           <div className="space-y-4">
             <h4 className="text-md font-medium text-gray-700">Property & Department Matrix</h4>
             <div className="border border-gray-200 rounded-lg divide-y divide-gray-200">
-              {properties?.map((property) => {
+              {scopedProperties.map((property) => {
                 const propertyDeptIds = property.departments.map((d) => d.department.id)
                 const selectedCount = selectedPermissions[property.id]?.length || 0
                 const isAllSelected = selectedCount === property.departments.length && selectedCount > 0

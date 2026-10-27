@@ -1,5 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import { Role } from '@prisma/client';
 import { PrismaService } from '../shared/prisma/prisma.service';
+import { propertyWhereForScopes } from '../auth/scope-query';
+import type { UserScopeGrant } from '../auth/interfaces/user-context.interface';
 
 export interface ScopeSummary {
   scopeId: string;
@@ -18,33 +21,15 @@ export interface ScopeSummary {
 export class DashboardService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async getScopeSummary(activeScopeId?: string): Promise<ScopeSummary> {
-    let propertyFilter: any = {};
-
-    if (activeScopeId) {
-      const [isOrg, isDiv, isHub, isProp] = await Promise.all([
-        this.prisma.organization.findUnique({ where: { id: activeScopeId } }),
-        this.prisma.division.findUnique({ where: { id: activeScopeId } }),
-        this.prisma.hub.findUnique({ where: { id: activeScopeId } }),
-        this.prisma.property.findUnique({ where: { id: activeScopeId } }),
-      ]);
-
-      if (isOrg) {
-        propertyFilter = { organizationId: activeScopeId };
-      } else if (isDiv) {
-        propertyFilter = { divisionId: activeScopeId };
-      } else if (isHub) {
-        propertyFilter = { hubs: { some: { id: activeScopeId } } };
-      } else if (isProp) {
-        propertyFilter = { id: activeScopeId };
-      }
-    }
-
+  async getScopeSummary(activeScopes: UserScopeGrant[]): Promise<ScopeSummary> {
     // Aggregate properties and associated department relations bottom-up
     const properties = await this.prisma.property.findMany({
-      where: propertyFilter,
+      where: propertyWhereForScopes(activeScopes),
       include: {
         departments: {
+          where: activeScopes.some((scope) => scope.role === Role.ADMIN)
+            ? {}
+            : { departmentId: { in: [...new Set(activeScopes.flatMap((scope) => scope.departmentIds))] } },
           include: { department: true },
         },
       },
@@ -58,14 +43,16 @@ export class DashboardService {
 
     // Count users scoped to the current scope
     const userScopes = await this.prisma.userScope.findMany({
-      where: activeScopeId ? { entityId: activeScopeId } : {},
+      where: activeScopes.length > 0
+        ? { OR: activeScopes.map(({ entityId, scopeLevel }) => ({ entityId, scopeLevel })) }
+        : { id: { in: [] } },
       include: { user: true },
     });
 
     const activeUsers = userScopes.filter((s) => s.user.status === 'ACTIVE').length;
 
     return {
-      scopeId: activeScopeId || 'GLOBAL',
+      scopeId: activeScopes.length === 1 ? activeScopes[0].entityId : 'ASSIGNED',
       totalProperties: properties.length,
       totalConfiguredDepartments: uniqueDepartmentIds.size,
       activeUsersCount: activeUsers,

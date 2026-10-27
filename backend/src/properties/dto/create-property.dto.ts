@@ -1,4 +1,4 @@
-import { IsNotEmpty, IsString, Length, Matches } from 'class-validator';
+import { IsNotEmpty, IsOptional, IsString, IsUUID, Length, Matches } from 'class-validator';
 
 /**
  * Data Transfer Object for creating a new Property.
@@ -21,4 +21,8 @@ export class CreatePropertyDto {
   @IsString()
   @IsNotEmpty()
   readonly organizationId: string;
+
+  @IsOptional()
+  @IsUUID('4')
+  readonly hubId?: string;
 }

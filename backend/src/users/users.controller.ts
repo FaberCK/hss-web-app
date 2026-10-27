@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, HttpCode, HttpStatus, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, HttpCode, HttpStatus, UseGuards, Req } from '@nestjs/common';
+import * as express from 'express';
 import { UsersService } from './users.service';
 import { InviteUserDto } from './dto/invite-user.dto';
 import { User } from '@prisma/client';
@@ -18,8 +19,9 @@ export class UsersController {
   }
 
   @Get()
+  @Roles('ADMIN')
   @HttpCode(HttpStatus.OK)
-  async findAll(): Promise<User[]> {
-    return this.usersService.findAllUsers();
+  async findAll(@Req() req: express.Request): Promise<User[]> {
+    return this.usersService.findAllUsers(req.user!.activeScopes);
   }
 }
