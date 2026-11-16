@@ -13,6 +13,6 @@ export class OrganizationsController {
   @Get()
   @Roles(Role.ADMIN)
   async findAll(@Req() req: express.Request): Promise<Organization[]> {
-    return this.organizationsService.findAvailable(req.user!.organizationId);
+    return this.organizationsService.findAvailable(req.user!.activeScopes);
   }
 }

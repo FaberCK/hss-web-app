@@ -18,11 +18,13 @@ export class DivisionsService {
     });
   }
 
-  async create(dto: CreateDivisionDto, scopes: UserScopeGrant[], userOrganizationId: string): Promise<Division> {
+  async create(dto: CreateDivisionDto, scopes: UserScopeGrant[]): Promise<Division> {
     const canAssignOrganization = scopes.some(
-      (scope) => scope.scopeLevel === ScopeLevel.ORGANIZATION && scope.entityId === dto.organizationId,
+      (scope) => scope.role === Role.ADMIN
+        && scope.scopeLevel === ScopeLevel.ORGANIZATION
+        && scope.entityId === dto.organizationId,
     );
-    if (!canAssignOrganization || dto.organizationId !== userOrganizationId) {
+    if (!canAssignOrganization) {
       throw new ForbiddenException('You can only create divisions in an organization you administer.');
     }
 

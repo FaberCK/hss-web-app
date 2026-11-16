@@ -26,7 +26,7 @@ export class PropertiesService {
       : { AND: [{ id: divisionId }, divisionWhereForScopes(scopes)] };
     const division = await this.prisma.division.findFirst({
       where: divisionWhere,
-      select: { id: true },
+      select: { id: true, organizationId: true },
     });
     if (!division) {
       throw new NotFoundException(`Division with ID '${divisionId}' not found.`);
@@ -50,7 +50,7 @@ export class PropertiesService {
         name: createPropertyDto.name,
         code,
         divisionId,
-        organizationId: createPropertyDto.organizationId,
+        organizationId: division.organizationId,
         ...(hubId ? { hubs: { connect: { id: hubId } } } : {}),
       },
     });

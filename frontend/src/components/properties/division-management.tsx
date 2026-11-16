@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import axios from "axios"
 import { Button, Card, CardBody, CardHeader, Input, Select, SelectItem, Spinner } from "@nextui-org/react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -39,6 +39,8 @@ export function DivisionManagement() {
     queryFn: async () => (await apiClient.get("/divisions")).data,
   })
 
+  const selectedOrganizationId = newOrganizationId || user?.activeScopeId || ""
+
   const organizationsQuery = useQuery<Organization[]>({
     queryKey: ["organizations"],
     queryFn: async () => (await apiClient.get("/organizations")).data,
@@ -46,12 +48,6 @@ export function DivisionManagement() {
   })
 
   const organizations = organizationsQuery.data ?? []
-
-  useEffect(() => {
-    if (!newOrganizationId && user?.organizationId) {
-      setNewOrganizationId(user.organizationId)
-    }
-  }, [newOrganizationId, user?.organizationId])
 
   async function refreshDivisionData() {
     await Promise.all([
@@ -64,7 +60,7 @@ export function DivisionManagement() {
   const createMutation = useMutation({
     mutationFn: async () => apiClient.post("/divisions", {
       name: newName.trim(),
-      organizationId: newOrganizationId,
+      organizationId: selectedOrganizationId,
     }),
     onSuccess: async () => {
       await refreshDivisionData()
@@ -108,7 +104,7 @@ export function DivisionManagement() {
     return <p className="text-sm text-danger">Could not load division or organization data.</p>
   }
 
-  const canCreateDivision = user?.scopeLevel === "ORGANIZATION"
+  const canCreateDivision = user?.scopeLevel === "ORGANIZATION" && user.roles.includes("ADMIN")
 
   return (
     <Card className="shadow-sm border border-gray-200">
@@ -135,7 +131,7 @@ export function DivisionManagement() {
             />
             <Select
               label="Organization"
-              selectedKeys={newOrganizationId ? [newOrganizationId] : []}
+              selectedKeys={selectedOrganizationId ? [selectedOrganizationId] : []}
               onChange={(event) => setNewOrganizationId(event.target.value)}
               isRequired
             >
@@ -147,7 +143,7 @@ export function DivisionManagement() {
               type="submit"
               color="primary"
               isLoading={createMutation.isPending}
-              isDisabled={!newName.trim() || !newOrganizationId}
+              isDisabled={!newName.trim() || !selectedOrganizationId}
             >
               Create Division
             </Button>

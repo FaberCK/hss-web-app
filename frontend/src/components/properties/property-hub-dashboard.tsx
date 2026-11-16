@@ -70,7 +70,7 @@ export function PropertyHubDashboard() {
   const [selectedPropertyIds, setSelectedPropertyIds] = useState<string[]>([])
   const availableDivisions = divisions ?? []
   const standaloneDivisions = user?.scopeLevel === "ORGANIZATION"
-    ? availableDivisions.filter((division) => division.organizationId === user.organizationId)
+    ? availableDivisions
     : user?.scopeLevel === "DIVISION"
       ? availableDivisions.filter((division) => division.id === user.activeScopeId)
       : []

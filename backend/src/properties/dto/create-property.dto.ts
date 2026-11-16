@@ -18,10 +18,6 @@ export class CreatePropertyDto {
   @IsNotEmpty()
   readonly divisionId: string;
 
-  @IsString()
-  @IsNotEmpty()
-  readonly organizationId: string;
-
   @IsOptional()
   @IsUUID('4')
   readonly hubId?: string;

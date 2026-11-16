@@ -2,7 +2,6 @@ import { useEffect, useState } from "react"
 import { Modal, ModalContent, ModalHeader, ModalBody, ModalFooter, Button, Input, Select, SelectItem } from "@nextui-org/react"
 import { useQueryClient } from "@tanstack/react-query"
 import { apiClient } from "../../lib/api"
-import { useAuth } from "../../hooks/use-auth"
 
 interface AddPropertyModalProps {
   isOpen: boolean;
@@ -17,7 +16,6 @@ interface AddPropertyModalProps {
 
 export function AddPropertyModal({ isOpen, onOpenChange, hub, divisions }: AddPropertyModalProps) {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
   const [formData, setFormData] = useState({
     name: "",
     code: ""
@@ -65,7 +63,6 @@ export function AddPropertyModal({ isOpen, onOpenChange, hub, divisions }: AddPr
         name: formData.name,
         code: formData.code,
         divisionId: hub?.divisionId ?? divisionId,
-        organizationId: user?.organizationId || "",
         ...(hub ? { hubId: hub.id } : {}),
       });
       
@@ -146,7 +143,7 @@ export function AddPropertyModal({ isOpen, onOpenChange, hub, divisions }: AddPr
                 color="primary" 
                 onPress={handleSubmit}
                 isLoading={isLoading}
-                isDisabled={!formData.name || !formData.code || !user?.organizationId || !(hub?.divisionId ?? divisionId)}
+                isDisabled={!formData.name || !formData.code || !(hub?.divisionId ?? divisionId)}
               >
                 Create Property
               </Button>

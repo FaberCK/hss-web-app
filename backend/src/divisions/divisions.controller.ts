@@ -22,7 +22,7 @@ export class DivisionsController {
   @Roles(Role.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   async create(@Body() dto: CreateDivisionDto, @Req() req: express.Request): Promise<Division> {
-    return this.divisionsService.create(dto, req.user!.activeScopes, req.user!.organizationId);
+    return this.divisionsService.create(dto, req.user!.activeScopes);
   }
 
   @Patch(':id')
